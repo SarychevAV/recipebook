@@ -1,11 +1,10 @@
 spring:
-  datasource:
-    url: ${spring.datasource.url:jdbc:postgresql://localhost:5432/recipebook_test}
-    username: ${spring.datasource.username:recipebook}
-    password: ${spring.datasource.password:secret}
+  jpa:
+    show-sql: false
 
 jwt:
-  secret: test-secret-that-is-at-least-256-bits-long-for-hmac-sha256
+  # Base64-encoded test secret (256-bit). FOR TESTS ONLY — never use in production.
+  secret: dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RpbmctbXVzdC1iZS1sb25nLWVub3VnaA==
   expiration-ms: 86400000
   refresh-expiration-ms: 604800000
 
@@ -13,4 +12,4 @@ minio:
   endpoint: http://localhost:9000
   access-key: minioadmin
   secret-key: minioadmin
-  bucket: recipebook-photos-test
+  bucket: test-bucket
