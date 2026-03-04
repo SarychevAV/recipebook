@@ -1,8 +1,6 @@
 databaseChangeLog:
   - logicalFilePath: db.changelog-master.yaml
 
-  # Migrations will be added here as features are implemented.
-  # Example:
-  # - include:
-  #     file: V1__create_users.sql
-  #     relativeToChangelogFile: true
+  - include:
+      file: V1__create_users.sql
+      relativeToChangelogFile: true
