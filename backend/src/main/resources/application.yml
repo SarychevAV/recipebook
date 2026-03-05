@@ -2,6 +2,11 @@ spring:
   application:
     name: recipebook
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -36,6 +41,15 @@ minio:
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
   bucket: recipebook-photos
+  public-url: ${MINIO_PUBLIC_URL:http://localhost:9000}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
 
 logging:
   level:

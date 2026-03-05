@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { loginSchema, type LoginFormData } from '../../lib/schemas';
 import { useLogin } from '../../hooks/useAuth';
 import { getErrorMessage } from '../../lib/utils';
+import { FormField } from './FormField';
 
 export function LoginForm() {
   const { mutate: login, isPending, error } = useLogin();
@@ -18,58 +19,63 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-          Email
-        </label>
+      <FormField label="Email" error={errors.email?.message}>
         <input
           id="email"
           type="email"
           autoComplete="email"
+          placeholder="you@example.com"
           {...register('email')}
-          className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="auth-input"
         />
-        {errors.email && (
-          <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
-        )}
-      </div>
+      </FormField>
 
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-          Password
-        </label>
+      <FormField label="Пароль" error={errors.password?.message}>
         <input
           id="password"
           type="password"
           autoComplete="current-password"
+          placeholder="••••••••"
           {...register('password')}
-          className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="auth-input"
         />
-        {errors.password && (
-          <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
-        )}
-      </div>
+      </FormField>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
           {getErrorMessage(error)}
-        </p>
+        </div>
       )}
 
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        className="auth-btn-primary"
       >
-        {isPending ? 'Signing in…' : 'Sign in'}
+        {isPending ? (
+          <span className="flex items-center justify-center gap-2">
+            <Spinner /> Входим…
+          </span>
+        ) : (
+          'Войти'
+        )}
       </button>
 
-      <p className="text-center text-sm text-gray-600">
-        Don&apos;t have an account?{' '}
-        <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-          Register
+      <p className="text-center text-sm text-gray-500">
+        Нет аккаунта?{' '}
+        <Link to="/register" className="font-semibold text-orange-500 hover:text-orange-600 transition-colors">
+          Создайте его
         </Link>
       </p>
     </form>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
