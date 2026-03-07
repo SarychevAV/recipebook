@@ -159,10 +159,10 @@ export default function AdminModerationPage() {
 
   return (
     <AppLayout>
-      <div className="px-8 py-8">
+      <div className="px-4 py-5 md:px-8 md:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Модерация рецептов</h1>
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Модерация рецептов</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {isLoading ? '…' : `${recipes.length} рецептов ожидают проверки`}
           </p>

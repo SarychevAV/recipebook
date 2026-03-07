@@ -70,6 +70,15 @@ function SlidersIcon() {
   );
 }
 
+function XIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 const PUBLIC_NAV_ITEMS = [
   { label: 'Лента',           path: '/',             Icon: HomeIcon },
   { label: 'Открыть',         path: '/explore',      Icon: CompassIcon },
@@ -81,7 +90,11 @@ const AUTH_NAV_ITEMS = [
   { label: 'Мои рецепты',     path: '/my-recipes',   Icon: BookOpenIcon },
 ];
 
-export function Sidebar() {
+interface Props {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, clearAuth } = useAuth();
@@ -97,8 +110,8 @@ export function Sidebar() {
   return (
     <aside className="w-56 shrink-0 flex flex-col h-full bg-white border-r border-gray-100">
       {/* Logo */}
-      <div className="px-5 pt-6 pb-4">
-        <Link to="/" className="flex items-center gap-2.5">
+      <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5" onClick={onClose}>
           <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="12" cy="15" r="7" />
@@ -108,6 +121,15 @@ export function Sidebar() {
           </span>
           <span className="text-sm font-bold text-gray-900 tracking-tight">Мандаринка</span>
         </Link>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+            aria-label="Закрыть меню"
+          >
+            <XIcon />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -121,6 +143,7 @@ export function Sidebar() {
             <Link
               key={path}
               to={path}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
                   ? 'bg-orange-50 text-orange-600'
@@ -143,6 +166,7 @@ export function Sidebar() {
             <div className="px-3 py-3">
               <Link
                 to="/preferences"
+                onClick={onClose}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
               >
                 <span className="text-gray-400">
@@ -178,13 +202,13 @@ export function Sidebar() {
         ) : (
           <div className="px-4 py-4 space-y-2">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => { navigate('/login'); onClose?.(); }}
               className="w-full py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Войти
             </button>
             <button
-              onClick={() => navigate('/register')}
+              onClick={() => { navigate('/register'); onClose?.(); }}
               className="w-full py-2 rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
             >
               Зарегистрироваться

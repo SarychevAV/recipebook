@@ -65,7 +65,7 @@ export function RecipeDetail({ recipe }: Props) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-5 md:px-6 md:py-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-gray-400 mb-6">
         <Link to="/" className="hover:text-orange-500 transition-colors">Лента</Link>
@@ -93,26 +93,28 @@ export function RecipeDetail({ recipe }: Props) {
         {/* Info panel */}
         <div className="flex-1 min-w-0">
           {/* Title + actions */}
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <h1 className="text-2xl font-bold text-gray-900 leading-tight">{recipe.title}</h1>
-            {isOwner && (
-              <div className="flex items-center gap-2 shrink-0">
-                {!isPending && (
-                  <Link
-                    to={`/recipes/${recipe.id}/edit`}
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          <div className="mb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight">{recipe.title}</h1>
+              {isOwner && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {!isPending && (
+                    <Link
+                      to={`/recipes/${recipe.id}/edit`}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    >
+                      Редактировать
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                   >
-                    Редактировать
-                  </Link>
-                )}
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                >
-                  Удалить
-                </button>
-              </div>
-            )}
+                    Удалить
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Status panel for owner */}

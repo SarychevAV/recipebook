@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@org.springframework.core.annotation.Order(1)
 public class AdminInitializer implements ApplicationRunner {
 
     @Value("${admin.email}")

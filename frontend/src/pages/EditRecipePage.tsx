@@ -39,7 +39,7 @@ export default function EditRecipePage() {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto px-6 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-5 md:px-6 md:py-8">
         {/* Header */}
         <div className="mb-8">
           <Link

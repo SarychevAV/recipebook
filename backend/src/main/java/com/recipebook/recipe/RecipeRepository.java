@@ -47,6 +47,8 @@ public interface RecipeRepository extends JpaRepository<RecipeEntity, UUID>,
            countQuery = "SELECT COUNT(r) FROM RecipeEntity r WHERE r.owner.id = :ownerId")
     Page<RecipeEntity> findByOwnerIdWithTags(@Param("ownerId") UUID ownerId, Pageable pageable);
 
+    boolean existsByStatus(RecipeStatus status);
+
     /**
      * Fetches all PENDING_REVIEW recipes with tags (for admin moderation).
      */
