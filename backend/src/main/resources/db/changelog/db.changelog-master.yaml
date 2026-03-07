@@ -20,3 +20,11 @@ databaseChangeLog:
   - include:
       file: V5__add_photo_url_to_recipes.sql
       relativeToChangelogFile: true
+
+  - include:
+      file: V6__add_recipe_status.sql
+      relativeToChangelogFile: true
+
+  - include:
+      file: V7__reset_admin_user.sql
+      relativeToChangelogFile: true

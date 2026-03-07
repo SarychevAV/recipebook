@@ -38,8 +38,7 @@ public class RecipeController {
 
     @GetMapping
     @Operation(summary = "Поиск и фильтрация рецептов",
-               description = "Возвращает постраничный список рецептов. Доступен без авторизации. " +
-                             "Поддерживает фильтрацию по названию, тегу и времени приготовления.")
+               description = "Возвращает постраничный список опубликованных рецептов. Доступен без авторизации.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Список рецептов успешно получен")
     })
@@ -59,9 +58,22 @@ public class RecipeController {
         return ResponseEntity.ok(ApiResponse.of(page));
     }
 
+    @GetMapping("/my")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Мои рецепты",
+               description = "Возвращает все рецепты текущего пользователя во всех статусах.")
+    public ResponseEntity<ApiResponse<Page<RecipeSummaryResponse>>> getMyRecipes(
+            @AuthenticationPrincipal UserEntity currentUser,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+
+        Page<RecipeSummaryResponse> page = recipeService.getMyRecipes(currentUser.getId(), pageable);
+        return ResponseEntity.ok(ApiResponse.of(page));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Получить рецепт по ID",
-               description = "Возвращает полную информацию о рецепте, включая ингредиенты и теги. Доступен без авторизации.")
+               description = "Возвращает полную информацию о рецепте. Неопубликованные рецепты доступны только владельцу или администратору.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Рецепт найден"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Рецепт не найден",
@@ -69,14 +81,15 @@ public class RecipeController {
     })
     public ResponseEntity<ApiResponse<RecipeResponse>> getById(
             @Parameter(description = "Идентификатор рецепта", required = true)
-            @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.of(recipeService.findById(id)));
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserEntity currentUser) {
+        return ResponseEntity.ok(ApiResponse.of(recipeService.findById(id, currentUser)));
     }
 
     @PostMapping
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Создать новый рецепт",
-               description = "Создаёт рецепт от имени аутентифицированного пользователя")
+               description = "Создаёт рецепт со статусом DRAFT от имени аутентифицированного пользователя")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Рецепт успешно создан"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Некорректные данные запроса",
@@ -92,13 +105,33 @@ public class RecipeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Рецепт создан"));
     }
 
+    @PostMapping("/{id}/submit")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Отправить рецепт на проверку",
+               description = "Переводит рецепт из статуса DRAFT или REJECTED в PENDING_REVIEW. Только владелец.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Рецепт отправлен на проверку"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Недопустимая операция для текущего статуса",
+                    content = @Content(schema = @Schema(ref = "#/components/schemas/ProblemDetail"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Рецепт не найден",
+                    content = @Content(schema = @Schema(ref = "#/components/schemas/ProblemDetail")))
+    })
+    public ResponseEntity<ApiResponse<RecipeResponse>> submitForReview(
+            @Parameter(description = "Идентификатор рецепта", required = true)
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserEntity currentUser) {
+
+        RecipeResponse response = recipeService.submitForReview(id, currentUser);
+        return ResponseEntity.ok(ApiResponse.of(response, "Рецепт отправлен на проверку"));
+    }
+
     @PutMapping("/{id}")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Обновить рецепт",
-               description = "Обновляет рецепт. Разрешено только владельцу рецепта.")
+               description = "Обновляет рецепт. Разрешено только владельцу. Нельзя редактировать рецепт в статусе PENDING_REVIEW.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Рецепт успешно обновлён"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Некорректные данные запроса",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Некорректные данные запроса или недопустимая операция",
                     content = @Content(schema = @Schema(ref = "#/components/schemas/ProblemDetail"))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Требуется авторизация",
                     content = @Content(schema = @Schema(ref = "#/components/schemas/ProblemDetail"))),

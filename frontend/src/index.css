@@ -7,6 +7,10 @@
     box-sizing: border-box;
   }
 
+  html {
+    font-size: 20px;
+  }
+
   body {
     @apply antialiased text-gray-900;
   }

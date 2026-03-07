@@ -1,5 +1,6 @@
 package com.recipebook.recipe;
 
+import com.recipebook.common.exception.InvalidOperationException;
 import com.recipebook.common.exception.RecipeNotFoundException;
 import com.recipebook.common.exception.UnauthorizedAccessException;
 import com.recipebook.ingredient.IngredientEntity;
@@ -10,6 +11,7 @@ import com.recipebook.recipe.dto.UpdateRecipeRequest;
 import com.recipebook.storage.StorageService;
 import com.recipebook.tag.TagEntity;
 import com.recipebook.tag.TagRepository;
+import com.recipebook.user.Role;
 import com.recipebook.user.UserEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,18 +42,38 @@ public class RecipeService {
     public Page<RecipeSummaryResponse> search(String q, UUID tagId,
                                               Integer minTime, Integer maxTime,
                                               Pageable pageable) {
-        Specification<RecipeEntity> spec = buildSpec(q, tagId, minTime, maxTime);
-        Page<RecipeEntity> page = (spec == null)
-                ? recipeRepository.findAllWithTags(pageable)
-                : recipeRepository.findAll(spec, pageable);
+        Specification<RecipeEntity> spec = RecipeSpecification.isPublished();
+        Specification<RecipeEntity> filters = buildFiltersSpec(q, tagId, minTime, maxTime);
+        if (filters != null) {
+            spec = spec.and(filters);
+        }
+        Page<RecipeEntity> page = recipeRepository.findAll(spec, pageable);
         return page.map(recipeMapper::toSummaryResponse);
     }
 
     @Transactional(readOnly = true)
-    public RecipeResponse findById(UUID id) {
+    public RecipeResponse findById(UUID id, UserEntity currentUser) {
         RecipeEntity recipe = recipeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RecipeNotFoundException(id));
-        return recipeMapper.toResponse(recipe);
+
+        if (recipe.getStatus() == RecipeStatus.PUBLISHED) {
+            return recipeMapper.toResponse(recipe);
+        }
+
+        boolean isOwner = currentUser != null && recipe.getOwner().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser != null && currentUser.getRole() == Role.ADMIN;
+
+        if (isOwner || isAdmin) {
+            return recipeMapper.toResponse(recipe);
+        }
+
+        throw new RecipeNotFoundException(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RecipeSummaryResponse> getMyRecipes(UUID ownerId, Pageable pageable) {
+        Page<RecipeEntity> page = recipeRepository.findByOwnerIdWithTags(ownerId, pageable);
+        return page.map(recipeMapper::toSummaryResponse);
     }
 
     @Transactional
@@ -83,6 +105,10 @@ public class RecipeService {
 
         assertOwner(recipe, currentUser);
 
+        if (recipe.getStatus() == RecipeStatus.PENDING_REVIEW) {
+            throw new InvalidOperationException("Cannot edit recipe while pending review");
+        }
+
         recipe.update(request.title(), request.description(), request.instructions(),
                 request.cookingTimeMinutes(), request.servings());
         recipe.replaceTags(resolveTags(request.tagIds()));
@@ -90,8 +116,30 @@ public class RecipeService {
         List<IngredientEntity> ingredients = buildIngredients(request.ingredients(), recipe);
         recipe.replaceIngredients(ingredients);
 
+        if (recipe.getStatus() == RecipeStatus.REJECTED) {
+            recipe.updateStatus(RecipeStatus.DRAFT, null);
+        }
+
         RecipeEntity saved = recipeRepository.save(recipe);
         log.info("Recipe updated: id={}, owner={}", id, currentUser.getId());
+        return recipeMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public RecipeResponse submitForReview(UUID id, UserEntity currentUser) {
+        RecipeEntity recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new RecipeNotFoundException(id));
+
+        assertOwner(recipe, currentUser);
+
+        if (recipe.getStatus() != RecipeStatus.DRAFT && recipe.getStatus() != RecipeStatus.REJECTED) {
+            throw new InvalidOperationException(
+                    "Only DRAFT or REJECTED recipes can be submitted for review, current status: " + recipe.getStatus());
+        }
+
+        recipe.updateStatus(RecipeStatus.PENDING_REVIEW, null);
+        RecipeEntity saved = recipeRepository.save(recipe);
+        log.info("Recipe submitted for review: id={}, owner={}", id, currentUser.getId());
         return recipeMapper.toResponse(saved);
     }
 
@@ -128,8 +176,8 @@ public class RecipeService {
 
     // ── private helpers ──────────────────────────────────────────────────────
 
-    private Specification<RecipeEntity> buildSpec(String q, UUID tagId,
-                                                   Integer minTime, Integer maxTime) {
+    private Specification<RecipeEntity> buildFiltersSpec(String q, UUID tagId,
+                                                         Integer minTime, Integer maxTime) {
         Specification<RecipeEntity> spec = null;
 
         if (q != null && !q.isBlank()) {

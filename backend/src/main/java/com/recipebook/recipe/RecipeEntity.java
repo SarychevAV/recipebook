@@ -36,6 +36,14 @@ public class RecipeEntity extends BaseEntity {
     @Column(length = 1000)
     private String photoUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private RecipeStatus status = RecipeStatus.DRAFT;
+
+    @Column(columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private UserEntity owner;
@@ -76,5 +84,10 @@ public class RecipeEntity extends BaseEntity {
     public void replaceIngredients(List<IngredientEntity> newIngredients) {
         this.ingredients.clear();
         this.ingredients.addAll(newIngredients);
+    }
+
+    public void updateStatus(RecipeStatus status, String rejectionReason) {
+        this.status = status;
+        this.rejectionReason = rejectionReason;
     }
 }

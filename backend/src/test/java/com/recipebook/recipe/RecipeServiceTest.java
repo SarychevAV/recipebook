@@ -1,5 +1,6 @@
 package com.recipebook.recipe;
 
+import com.recipebook.common.exception.InvalidOperationException;
 import com.recipebook.common.exception.RecipeNotFoundException;
 import com.recipebook.common.exception.UnauthorizedAccessException;
 import com.recipebook.ingredient.IngredientEntity;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -33,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +55,7 @@ class RecipeServiceTest {
 
     private UserEntity owner;
     private UserEntity otherUser;
+    private UserEntity adminUser;
     private RecipeEntity sampleRecipe;
 
     @BeforeEach
@@ -71,6 +75,14 @@ class RecipeServiceTest {
                 .role(Role.USER)
                 .build();
         ReflectionTestUtils.setField(otherUser, "id", UUID.randomUUID());
+
+        adminUser = UserEntity.builder()
+                .username("admin")
+                .email("admin@example.com")
+                .password("encoded")
+                .role(Role.ADMIN)
+                .build();
+        ReflectionTestUtils.setField(adminUser, "id", UUID.randomUUID());
 
         sampleRecipe = RecipeEntity.builder()
                 .title("Pasta Carbonara")
@@ -125,17 +137,81 @@ class RecipeServiceTest {
         verify(tagRepository).findAllByIdIn(Set.of(tagId));
     }
 
+    @Test
+    void create_whenNewRecipe_thenStatusIsDraft() {
+        CreateRecipeRequest request = new CreateRecipeRequest(
+                "New Recipe", null, "Instructions", 20, 2,
+                List.of(new IngredientRequest("Egg", "2", "pcs", 0)),
+                Set.of()
+        );
+        when(recipeRepository.save(any(RecipeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(recipeMapper.toResponse(any())).thenReturn(buildRecipeResponse(sampleRecipe));
+
+        recipeService.create(request, owner);
+
+        verify(recipeRepository).save(argThat(r -> r.getStatus() == RecipeStatus.DRAFT));
+    }
+
     // ── findById ──────────────────────────────────────────────────────────────
 
     @Test
-    void findById_whenExists_thenReturnsResponse() {
+    void findById_whenDraftAndOwner_thenReturnsResponse() {
         UUID id = UUID.randomUUID();
+        // sampleRecipe is DRAFT by default
         RecipeResponse expected = buildRecipeResponse(sampleRecipe);
 
         when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
         when(recipeMapper.toResponse(sampleRecipe)).thenReturn(expected);
 
-        RecipeResponse result = recipeService.findById(id);
+        RecipeResponse result = recipeService.findById(id, owner);
+
+        assertThat(result.title()).isEqualTo("Pasta Carbonara");
+    }
+
+    @Test
+    void findById_whenPublished_thenReturnedToAnonymous() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.PUBLISHED, null);
+        RecipeResponse expected = buildRecipeResponse(sampleRecipe);
+
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(expected);
+
+        RecipeResponse result = recipeService.findById(id, null);
+
+        assertThat(result.title()).isEqualTo("Pasta Carbonara");
+    }
+
+    @Test
+    void findById_whenDraftAndAnonymous_thenThrowsRecipeNotFoundException() {
+        UUID id = UUID.randomUUID();
+        // sampleRecipe is DRAFT, no user
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.findById(id, null))
+                .isInstanceOf(RecipeNotFoundException.class);
+    }
+
+    @Test
+    void findById_whenDraftAndNotOwner_thenThrowsRecipeNotFoundException() {
+        UUID id = UUID.randomUUID();
+        // sampleRecipe is DRAFT, user is not the owner
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.findById(id, otherUser))
+                .isInstanceOf(RecipeNotFoundException.class);
+    }
+
+    @Test
+    void findById_whenDraftAndAdmin_thenReturnsResponse() {
+        UUID id = UUID.randomUUID();
+        // sampleRecipe is DRAFT, admin can see it
+        RecipeResponse expected = buildRecipeResponse(sampleRecipe);
+
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(expected);
+
+        RecipeResponse result = recipeService.findById(id, adminUser);
 
         assertThat(result.title()).isEqualTo("Pasta Carbonara");
     }
@@ -145,7 +221,7 @@ class RecipeServiceTest {
         UUID id = UUID.randomUUID();
         when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> recipeService.findById(id))
+        assertThatThrownBy(() -> recipeService.findById(id, null))
                 .isInstanceOf(RecipeNotFoundException.class)
                 .hasMessageContaining(id.toString());
     }
@@ -153,7 +229,7 @@ class RecipeServiceTest {
     // ── update ────────────────────────────────────────────────────────────────
 
     @Test
-    void update_whenOwnerUpdates_thenRecipeSaved() {
+    void update_whenOwnerUpdatesDraft_thenRecipeSaved() {
         UUID id = UUID.randomUUID();
         UpdateRecipeRequest request = new UpdateRecipeRequest(
                 "Updated Pasta", "Updated description", "New instructions",
@@ -161,7 +237,6 @@ class RecipeServiceTest {
                 List.of(new IngredientRequest("Pasta", "300", "g", 0)),
                 Set.of()
         );
-
         RecipeResponse expected = buildRecipeResponse(sampleRecipe);
 
         when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
@@ -172,6 +247,65 @@ class RecipeServiceTest {
 
         assertThat(result).isNotNull();
         verify(recipeRepository).save(sampleRecipe);
+    }
+
+    @Test
+    void update_whenPendingReview_thenThrowsInvalidOperationException() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.PENDING_REVIEW, null);
+        UpdateRecipeRequest request = new UpdateRecipeRequest(
+                "Title", null, "Instructions", null, null,
+                List.of(new IngredientRequest("Egg", "2", "pcs", 0)),
+                Set.of()
+        );
+
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.update(id, request, owner))
+                .isInstanceOf(InvalidOperationException.class)
+                .hasMessageContaining("pending review");
+
+        verify(recipeRepository, never()).save(any());
+    }
+
+    @Test
+    void update_whenRejected_thenStatusResetsToDraft() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.REJECTED, "Not detailed enough");
+        UpdateRecipeRequest request = new UpdateRecipeRequest(
+                "Better Pasta", "Improved description", "Detailed instructions",
+                30, 2,
+                List.of(new IngredientRequest("Pasta", "200", "g", 0)),
+                Set.of()
+        );
+
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeRepository.save(any(RecipeEntity.class))).thenReturn(sampleRecipe);
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(buildRecipeResponse(sampleRecipe));
+
+        recipeService.update(id, request, owner);
+
+        assertThat(sampleRecipe.getStatus()).isEqualTo(RecipeStatus.DRAFT);
+        assertThat(sampleRecipe.getRejectionReason()).isNull();
+    }
+
+    @Test
+    void update_whenPublished_thenStatusRemainsPublished() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.PUBLISHED, null);
+        UpdateRecipeRequest request = new UpdateRecipeRequest(
+                "Updated Title", null, "New instructions", 25, 2,
+                List.of(new IngredientRequest("Pasta", "200", "g", 0)),
+                Set.of()
+        );
+
+        when(recipeRepository.findByIdWithDetails(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeRepository.save(any(RecipeEntity.class))).thenReturn(sampleRecipe);
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(buildRecipeResponse(sampleRecipe));
+
+        recipeService.update(id, request, owner);
+
+        assertThat(sampleRecipe.getStatus()).isEqualTo(RecipeStatus.PUBLISHED);
     }
 
     @Test
@@ -204,6 +338,96 @@ class RecipeServiceTest {
 
         assertThatThrownBy(() -> recipeService.update(id, request, owner))
                 .isInstanceOf(RecipeNotFoundException.class);
+    }
+
+    // ── submitForReview ───────────────────────────────────────────────────────
+
+    @Test
+    void submitForReview_whenDraft_thenTransitionsToPendingReview() {
+        UUID id = UUID.randomUUID();
+        // sampleRecipe is DRAFT by default
+        when(recipeRepository.findById(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeRepository.save(sampleRecipe)).thenReturn(sampleRecipe);
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(buildRecipeResponse(sampleRecipe));
+
+        recipeService.submitForReview(id, owner);
+
+        assertThat(sampleRecipe.getStatus()).isEqualTo(RecipeStatus.PENDING_REVIEW);
+        verify(recipeRepository).save(sampleRecipe);
+    }
+
+    @Test
+    void submitForReview_whenRejected_thenTransitionsToPendingReview() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.REJECTED, "Some reason");
+        when(recipeRepository.findById(id)).thenReturn(Optional.of(sampleRecipe));
+        when(recipeRepository.save(sampleRecipe)).thenReturn(sampleRecipe);
+        when(recipeMapper.toResponse(sampleRecipe)).thenReturn(buildRecipeResponse(sampleRecipe));
+
+        recipeService.submitForReview(id, owner);
+
+        assertThat(sampleRecipe.getStatus()).isEqualTo(RecipeStatus.PENDING_REVIEW);
+    }
+
+    @Test
+    void submitForReview_whenPublished_thenThrowsInvalidOperationException() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.PUBLISHED, null);
+        when(recipeRepository.findById(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.submitForReview(id, owner))
+                .isInstanceOf(InvalidOperationException.class);
+
+        verify(recipeRepository, never()).save(any());
+    }
+
+    @Test
+    void submitForReview_whenPendingReview_thenThrowsInvalidOperationException() {
+        UUID id = UUID.randomUUID();
+        sampleRecipe.updateStatus(RecipeStatus.PENDING_REVIEW, null);
+        when(recipeRepository.findById(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.submitForReview(id, owner))
+                .isInstanceOf(InvalidOperationException.class);
+
+        verify(recipeRepository, never()).save(any());
+    }
+
+    @Test
+    void submitForReview_whenNotOwner_thenThrowsUnauthorizedAccessException() {
+        UUID id = UUID.randomUUID();
+        when(recipeRepository.findById(id)).thenReturn(Optional.of(sampleRecipe));
+
+        assertThatThrownBy(() -> recipeService.submitForReview(id, otherUser))
+                .isInstanceOf(UnauthorizedAccessException.class);
+
+        verify(recipeRepository, never()).save(any());
+    }
+
+    @Test
+    void submitForReview_whenNotFound_thenThrowsRecipeNotFoundException() {
+        UUID id = UUID.randomUUID();
+        when(recipeRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> recipeService.submitForReview(id, owner))
+                .isInstanceOf(RecipeNotFoundException.class);
+    }
+
+    // ── getMyRecipes ──────────────────────────────────────────────────────────
+
+    @Test
+    void getMyRecipes_thenDelegatesToRepositoryWithOwnerId() {
+        PageRequest pageable = PageRequest.of(0, 20);
+        Page<RecipeEntity> entityPage = new PageImpl<>(List.of(sampleRecipe));
+        RecipeSummaryResponse summary = buildSummaryResponse(sampleRecipe);
+
+        when(recipeRepository.findByOwnerIdWithTags(owner.getId(), pageable)).thenReturn(entityPage);
+        when(recipeMapper.toSummaryResponse(sampleRecipe)).thenReturn(summary);
+
+        Page<RecipeSummaryResponse> result = recipeService.getMyRecipes(owner.getId(), pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(recipeRepository).findByOwnerIdWithTags(owner.getId(), pageable);
     }
 
     // ── delete ────────────────────────────────────────────────────────────────
@@ -241,35 +465,33 @@ class RecipeServiceTest {
     // ── search ────────────────────────────────────────────────────────────────
 
     @Test
-    void search_whenNoFilters_thenDelegatesToFindAllWithTags() {
+    void search_whenNoFilters_thenUsesPublishedSpecification() {
         PageRequest pageable = PageRequest.of(0, 20);
         RecipeSummaryResponse summary = buildSummaryResponse(sampleRecipe);
         Page<RecipeEntity> entityPage = new PageImpl<>(List.of(sampleRecipe));
 
-        when(recipeRepository.findAllWithTags(pageable)).thenReturn(entityPage);
+        when(recipeRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(entityPage);
         when(recipeMapper.toSummaryResponse(sampleRecipe)).thenReturn(summary);
 
         Page<RecipeSummaryResponse> result = recipeService.search(null, null, null, null, pageable);
 
         assertThat(result.getContent()).hasSize(1);
-        verify(recipeRepository).findAllWithTags(pageable);
-        verify(recipeRepository, never()).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
+        verify(recipeRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
-    void search_whenQueryProvided_thenDelegatesToSpecification() {
+    void search_whenQueryProvided_thenUsesSpecificationWithFilters() {
         PageRequest pageable = PageRequest.of(0, 20);
         Page<RecipeEntity> entityPage = new PageImpl<>(List.of(sampleRecipe));
         RecipeSummaryResponse summary = buildSummaryResponse(sampleRecipe);
 
-        when(recipeRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
-                .thenReturn(entityPage);
+        when(recipeRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(entityPage);
         when(recipeMapper.toSummaryResponse(sampleRecipe)).thenReturn(summary);
 
         Page<RecipeSummaryResponse> result = recipeService.search("pasta", null, null, null, pageable);
 
         assertThat(result.getContent()).hasSize(1);
-        verify(recipeRepository, never()).findAllWithTags(any());
+        verify(recipeRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -280,7 +502,8 @@ class RecipeServiceTest {
                 recipe.getInstructions(), recipe.getCookingTimeMinutes(), recipe.getServings(), "",
                 owner.getUsername(), UUID.randomUUID(),
                 List.of(), List.of(),
-                Instant.now(), Instant.now()
+                Instant.now(), Instant.now(),
+                RecipeStatus.PUBLISHED, null
         );
     }
 
@@ -289,7 +512,8 @@ class RecipeServiceTest {
                 UUID.randomUUID(), recipe.getTitle(), recipe.getDescription(),
                 recipe.getCookingTimeMinutes(), recipe.getServings(), "",
                 owner.getUsername(), UUID.randomUUID(),
-                List.of(), Instant.now()
+                List.of(), Instant.now(),
+                RecipeStatus.PUBLISHED, null
         );
     }
 }

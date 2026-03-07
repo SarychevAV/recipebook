@@ -34,4 +34,8 @@ public final class RecipeSpecification {
         return (root, cq, cb) ->
                 cb.lessThanOrEqualTo(root.get("cookingTimeMinutes"), maxTime);
     }
+
+    public static Specification<RecipeEntity> isPublished() {
+        return (root, cq, cb) -> cb.equal(root.get("status"), RecipeStatus.PUBLISHED);
+    }
 }

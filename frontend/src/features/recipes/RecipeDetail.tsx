@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { RecipeDto } from '../../types/recipe';
 import { useAuth } from '../../store/authStore';
-import { useDeleteRecipe } from '../../hooks/useRecipes';
+import { useDeleteRecipe, useSubmitForReview } from '../../hooks/useRecipes';
 import { getErrorMessage } from '../../lib/utils';
 
 const GRADIENTS = [
@@ -35,11 +35,16 @@ export function RecipeDetail({ recipe }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const deleteMutation = useDeleteRecipe();
+  const submitMutation = useSubmitForReview(recipe.id);
   const [deleteError, setDeleteError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isOwner = user?.id === recipe.ownerId;
   const gradient = pickGradient(recipe.title);
   const steps = parseSteps(recipe.instructions);
+  const isPending = recipe.status === 'PENDING_REVIEW';
+  const isDraft = recipe.status === 'DRAFT';
+  const isRejected = recipe.status === 'REJECTED';
 
   async function handleDelete() {
     try {
@@ -47,6 +52,15 @@ export function RecipeDetail({ recipe }: Props) {
       navigate('/my-recipes');
     } catch (err) {
       setDeleteError(getErrorMessage(err));
+    }
+  }
+
+  async function handleSubmit() {
+    setSubmitError('');
+    try {
+      await submitMutation.mutateAsync();
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
     }
   }
 
@@ -62,10 +76,18 @@ export function RecipeDetail({ recipe }: Props) {
       {/* Hero row */}
       <div className="flex flex-col lg:flex-row gap-8 mb-10">
         {/* Cover image */}
-        <div className={`relative lg:w-5/12 h-72 lg:h-auto rounded-2xl overflow-hidden bg-gradient-to-br ${gradient} shrink-0`}>
-          <div className="absolute inset-0 flex items-center justify-center opacity-25">
-            <span className="text-9xl select-none">🍽️</span>
-          </div>
+        <div className={`relative lg:w-5/12 h-72 lg:h-auto rounded-2xl overflow-hidden shrink-0 ${!recipe.photoUrl ? `bg-gradient-to-br ${gradient}` : ''}`}>
+          {recipe.photoUrl ? (
+            <img
+              src={recipe.photoUrl}
+              alt={recipe.title}
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center opacity-25">
+              <span className="text-9xl select-none">🍽️</span>
+            </div>
+          )}
         </div>
 
         {/* Info panel */}
@@ -75,12 +97,14 @@ export function RecipeDetail({ recipe }: Props) {
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">{recipe.title}</h1>
             {isOwner && (
               <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  to={`/recipes/${recipe.id}/edit`}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                >
-                  Редактировать
-                </Link>
+                {!isPending && (
+                  <Link
+                    to={`/recipes/${recipe.id}/edit`}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                  >
+                    Редактировать
+                  </Link>
+                )}
                 <button
                   onClick={() => setConfirmDelete(true)}
                   className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
@@ -90,6 +114,57 @@ export function RecipeDetail({ recipe }: Props) {
               </div>
             )}
           </div>
+
+          {/* Status panel for owner */}
+          {isOwner && recipe.status !== 'PUBLISHED' && (
+            <div className="mb-4">
+              {isPending && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100">
+                  <span className="text-amber-500">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </span>
+                  <p className="text-xs text-amber-700 font-medium">Рецепт на проверке у модератора</p>
+                </div>
+              )}
+              {isDraft && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">Черновик</span>
+                  {submitError && <p className="text-xs text-red-500">{submitError}</p>}
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitMutation.isPending}
+                    className="text-xs font-medium px-3 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
+                  >
+                    {submitMutation.isPending ? 'Отправляем…' : 'Отправить на проверку'}
+                  </button>
+                </div>
+              )}
+              {isRejected && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-600">Отклонён</span>
+                    {submitError && <p className="text-xs text-red-500">{submitError}</p>}
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitMutation.isPending}
+                      className="text-xs font-medium px-3 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
+                    >
+                      {submitMutation.isPending ? 'Отправляем…' : 'Отправить повторно'}
+                    </button>
+                  </div>
+                  {recipe.rejectionReason && (
+                    <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
+                      Причина отклонения: {recipe.rejectionReason}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tags */}
           {recipe.tags.length > 0 && (

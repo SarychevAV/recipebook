@@ -1,5 +1,6 @@
 package com.recipebook.recipe.dto;
 
+import com.recipebook.recipe.RecipeStatus;
 import com.recipebook.tag.dto.TagResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -37,6 +38,12 @@ public record RecipeSummaryResponse(
         List<TagResponse> tags,
 
         @Schema(description = "Дата и время создания")
-        Instant createdAt
+        Instant createdAt,
+
+        @Schema(description = "Статус рецепта")
+        RecipeStatus status,
+
+        @Schema(description = "Причина отклонения (если статус REJECTED)")
+        String rejectionReason
 ) {
 }
