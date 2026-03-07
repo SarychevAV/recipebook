@@ -1,64 +1,62 @@
 # CLAUDE.md — recipebook
 
-This file is the source of truth for Claude Code when working on this project.
-Read it fully before starting any task.
+Это главный файл-инструкция для Claude Code. Читай его полностью перед началом любой задачи.
 
 ---
 
-## Project Overview
+## О проекте
 
-**recipebook** — a web application for saving and sharing cooking recipes.
-Users can browse public recipes without login, and authenticated users can create, edit, and manage their own recipes with photos.
+**recipebook** — веб-приложение для сохранения и публикации рецептов.
+Гости могут просматривать публичные рецепты без регистрации. Авторизованные пользователи могут создавать, редактировать и управлять своими рецептами с фотографиями.
 
-**Monorepo structure:**
+**Структура монорепо:**
 ```
 recipebook/
 ├── backend/          # Spring Boot 3 + Java 21
 ├── frontend/         # React + TypeScript + Vite
 ├── docker-compose.yml
-├── docker-compose.prod.yml
 └── CLAUDE.md
 ```
 
 ---
 
-## Tech Stack
+## Технологический стек
 
 ### Backend
-- **Java 21** (use records, sealed classes, pattern matching where appropriate)
+- **Java 21** (используй records, sealed classes, pattern matching там где уместно)
 - **Spring Boot 3.x**
-- **Spring Security 6** + JWT (stateless, no sessions)
+- **Spring Security 6** + JWT (stateless, без сессий)
 - **Spring Data JPA** + **PostgreSQL**
-- **Liquibase** for DB migrations
-- **MapStruct** for DTO mapping
-- **Lombok** (only for `@Builder`, `@Getter`, `@Slf4j` — avoid `@Data` on entities)
-- **Testcontainers** + **JUnit 5** + **MockMvc** for tests
-- **MinIO** (S3-compatible) for photo storage in dev; S3 in prod
+- **Liquibase** для миграций БД
+- **MapStruct** для маппинга DTO
+- **Lombok** (только `@Builder`, `@Getter`, `@Slf4j` — не используй `@Data` на entities)
+- **Testcontainers** + **JUnit 5** + **MockMvc** для тестов
+- **MinIO** (S3-совместимое хранилище) для фото в dev; S3 в prod
 
 ### Frontend
 - **React 18** + **TypeScript** (strict mode)
-- **Vite** as build tool
-- **TanStack Query v5** for server state
-- **React Hook Form** + **Zod** for forms and validation
-- **Tailwind CSS** + **shadcn/ui** for UI components
-- **React Router v6** for routing
-- **Axios** with interceptors for HTTP
+- **Vite** как сборщик
+- **TanStack Query v5** для серверного состояния
+- **React Hook Form** + **Zod** для форм и валидации
+- **Tailwind CSS** + **shadcn/ui** для UI компонентов
+- **React Router v6** для маршрутизации
+- **Axios** с interceptors для HTTP запросов
 
-### Infrastructure
-- **Docker + Docker Compose** for local dev
-- **Railway** for production hosting
-- **GitHub Actions** for CI
+### Инфраструктура
+- **Docker + Docker Compose** для локальной разработки
+- **Railway** для production хостинга
+- **GitHub Actions** для CI
 
 ---
 
-## Backend Architecture
+## Архитектура Backend
 
-### Package Structure (feature-based)
+### Структура пакетов (по фичам)
 ```
 com.recipebook/
 ├── common/
-│   ├── exception/        # GlobalExceptionHandler, custom exceptions
-│   ├── response/         # ApiResponse<T> wrapper
+│   ├── exception/        # GlobalExceptionHandler, кастомные исключения
+│   ├── response/         # ApiResponse<T> обёртка
 │   └── security/         # JwtFilter, JwtService, SecurityConfig
 ├── user/
 │   ├── UserEntity.java
@@ -74,19 +72,19 @@ com.recipebook/
 │   └── dto/
 ├── ingredient/
 ├── tag/
-└── storage/              # Photo upload abstraction
+└── storage/              # Абстракция для загрузки фото
 ```
 
-### Layering Rules
-- **Controller** → accepts HTTP, validates input, delegates to Service, returns ResponseEntity
-- **Service** → business logic only, no HTTP concerns, no direct repository calls from controllers
-- **Repository** → data access only, custom JPQL/native queries here
-- **Entity** → JPA mappings, no business logic, no serialization annotations
-- **DTO** → separate Request/Response DTOs per use case, mapped via MapStruct
+### Правила слоёв
+- **Controller** → принимает HTTP запросы, валидирует входные данные, делегирует в Service, возвращает ResponseEntity
+- **Service** → только бизнес-логика, без HTTP, без прямых вызовов Repository из Controller
+- **Repository** → только доступ к данным, кастомные JPQL/native запросы здесь
+- **Entity** → JPA маппинг, никакой бизнес-логики, никаких аннотаций сериализации
+- **DTO** → отдельные Request/Response DTO для каждого use case, маппинг через MapStruct
 
-### Entity Conventions
+### Соглашения по Entity
 ```java
-// Always use this base for entities
+// Всегда используй этот базовый класс для entities
 @MappedSuperclass
 public abstract class BaseEntity {
     @Id
@@ -100,26 +98,26 @@ public abstract class BaseEntity {
     private Instant updatedAt;
 }
 ```
-- Use `UUID` for all primary keys (never auto-increment Long for public APIs)
-- Avoid bidirectional JPA relationships unless strictly necessary
-- Use `FetchType.LAZY` by default
-- Never expose entities directly in API responses
+- Используй `UUID` для всех primary keys (никогда auto-increment Long для публичных API)
+- Избегай двунаправленных JPA связей без крайней необходимости
+- По умолчанию всегда `FetchType.LAZY`
+- Никогда не отдавай Entity напрямую в ответе API
 
-### API Conventions
+### Соглашения по API
 ```
-GET    /api/v1/recipes              # public, paginated
-GET    /api/v1/recipes/{id}         # public
-POST   /api/v1/recipes              # auth required
-PUT    /api/v1/recipes/{id}         # auth required, owner only
-DELETE /api/v1/recipes/{id}         # auth required, owner only
-POST   /api/v1/recipes/{id}/photos  # auth required, multipart
+GET    /api/v1/recipes              # публичный, с пагинацией
+GET    /api/v1/recipes/{id}         # публичный
+POST   /api/v1/recipes              # требует авторизации
+PUT    /api/v1/recipes/{id}         # требует авторизации, только владелец
+DELETE /api/v1/recipes/{id}         # требует авторизации, только владелец
+POST   /api/v1/recipes/{id}/photos  # требует авторизации, multipart
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
 GET    /api/v1/users/me
 ```
 
-### Response Format
-Always wrap responses in `ApiResponse<T>`:
+### Формат ответов
+Всегда оборачивай ответы в `ApiResponse<T>`:
 ```json
 {
   "data": { ... },
@@ -127,7 +125,7 @@ Always wrap responses in `ApiResponse<T>`:
   "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
-Errors follow RFC 7807 Problem Details:
+Ошибки следуют RFC 7807 Problem Details:
 ```json
 {
   "type": "/errors/not-found",
@@ -137,28 +135,28 @@ Errors follow RFC 7807 Problem Details:
 }
 ```
 
-### Exception Handling
-- All exceptions go through `@ControllerAdvice GlobalExceptionHandler`
-- Create domain-specific exceptions: `RecipeNotFoundException`, `UnauthorizedAccessException`
-- Never return 500 for business logic errors
-- Log with `@Slf4j` — ERROR for unexpected, WARN for business rule violations
+### Обработка исключений
+- Все исключения проходят через `@ControllerAdvice GlobalExceptionHandler`
+- Создавай доменные исключения: `RecipeNotFoundException`, `UnauthorizedAccessException`
+- Никогда не возвращай 500 для ошибок бизнес-логики
+- Логируй через `@Slf4j` — ERROR для неожиданных ошибок, WARN для нарушений бизнес-правил
 
-### Security Rules
-- JWT secret from environment variable `JWT_SECRET` (never hardcoded)
-- Token expiry: 24h access, 7d refresh
-- Public endpoints: `GET /api/v1/recipes/**`, `POST /api/v1/auth/**`
-- All other endpoints require authentication
-- Validate resource ownership in Service layer, not Controller
+### Правила безопасности
+- JWT секрет только из переменной окружения `JWT_SECRET` (никогда не хардкодить)
+- Время жизни токенов: 24ч access, 7д refresh
+- Публичные endpoints: `GET /api/v1/recipes/**`, `POST /api/v1/auth/**`
+- Все остальные endpoints требуют авторизации
+- Проверка владельца ресурса — в слое Service, не в Controller
 
-### Testing Standards
-- Unit tests for every Service method
-- Integration tests with Testcontainers for repositories and controllers
-- Test naming: `methodName_whenCondition_thenExpectedResult`
-- Minimum coverage target: 80% for service layer
-- Use `@Sql` annotations or builders for test data, never share mutable state between tests
+### Стандарты тестирования
+- Unit тесты для каждого метода Service
+- Integration тесты с Testcontainers для репозиториев и контроллеров
+- Именование тестов: `methodName_whenCondition_thenExpectedResult`
+- Минимальное покрытие: 80% для слоя Service
+- Используй `@Sql` аннотации или builders для тестовых данных, никогда не делись мутабельным состоянием между тестами
 
 ```java
-// Example test structure
+// Пример структуры теста
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -175,7 +173,7 @@ class RecipeServiceTest {
 }
 ```
 
-### Liquibase Migrations
+### Миграции Liquibase
 ```
 backend/src/main/resources/db/changelog/
 ├── db.changelog-master.yaml
@@ -184,42 +182,42 @@ backend/src/main/resources/db/changelog/
 ├── V3__create_ingredients.sql
 └── V4__create_tags.sql
 ```
-- One file per logical change, never edit existing migration files
-- Always include rollback scripts
+- Один файл на одно логическое изменение, никогда не редактируй существующие файлы миграций
+- Всегда добавляй rollback скрипты
 
 ---
 
-## Frontend Architecture
+## Архитектура Frontend
 
-### Project Structure
+### Структура проекта
 ```
 frontend/src/
-├── api/              # Axios instance + API functions per domain
+├── api/              # Axios instance + API функции по доменам
 ├── components/
-│   ├── ui/           # shadcn/ui base components (do not modify)
-│   └── shared/       # reusable app-level components
+│   ├── ui/           # shadcn/ui базовые компоненты (не изменять)
+│   └── shared/       # переиспользуемые компоненты приложения
 ├── features/
-│   ├── auth/         # Login, Register components + hooks
+│   ├── auth/         # Login, Register компоненты + hooks
 │   ├── recipes/      # RecipeCard, RecipeForm, RecipeDetail
-│   └── profile/      # User profile, my recipes
-├── hooks/            # Custom hooks
-├── lib/              # utils, zod schemas, constants
-├── pages/            # Route-level components only, thin wrappers
-├── router/           # Route definitions, protected route wrapper
-├── store/            # Auth state (Zustand or Context)
-└── types/            # Shared TypeScript types/interfaces
+│   └── profile/      # Профиль пользователя, мои рецепты
+├── hooks/            # Кастомные hooks
+├── lib/              # utils, zod schemas, константы
+├── pages/            # Компоненты уровня роута, только тонкие обёртки
+├── router/           # Описание роутов, protected route обёртка
+├── store/            # Auth состояние (Zustand или Context)
+└── types/            # Общие TypeScript типы и интерфейсы
 ```
 
-### Component Rules
-- One component per file
-- Feature components live in `features/`, not `components/`
-- Pages are thin — logic lives in hooks and features
-- Use `React.FC` sparingly — prefer plain function declarations
-- All forms use React Hook Form + Zod schema validation
+### Правила компонентов
+- Один компонент — один файл
+- Компоненты фич живут в `features/`, не в `components/`
+- Pages — тонкие обёртки, логика живёт в hooks и features
+- `React.FC` использовать редко — предпочитай обычные function declarations
+- Все формы используют React Hook Form + Zod валидацию
 
-### API Layer
+### Слой API
 ```typescript
-// api/recipes.ts — always type request and response
+// api/recipes.ts — всегда типизируй request и response
 export const getRecipes = (params: RecipeQueryParams): Promise<PagedResponse<RecipeDto>> =>
   api.get('/recipes', { params }).then(r => r.data);
 
@@ -227,14 +225,14 @@ export const createRecipe = (data: CreateRecipeRequest): Promise<RecipeDto> =>
   api.post('/recipes', data).then(r => r.data);
 ```
 
-### TanStack Query Conventions
+### Соглашения TanStack Query
 ```typescript
 // hooks/useRecipes.ts
 export const useRecipes = (params: RecipeQueryParams) =>
   useQuery({
     queryKey: ['recipes', params],
     queryFn: () => getRecipes(params),
-    staleTime: 1000 * 60 * 5, // 5 min for public data
+    staleTime: 1000 * 60 * 5, // 5 минут для публичных данных
   });
 
 export const useCreateRecipe = () =>
@@ -244,54 +242,54 @@ export const useCreateRecipe = () =>
   });
 ```
 
-### TypeScript Rules
-- `strict: true` in tsconfig — no exceptions
-- No `any` — use `unknown` and type guards if needed
-- All API response types must mirror backend DTOs exactly
-- Zod schemas double as runtime validators and type sources
+### Правила TypeScript
+- `strict: true` в tsconfig — без исключений
+- Никакого `any` — используй `unknown` и type guards если нужно
+- Все типы ответов API должны точно соответствовать backend DTO
+- Zod schemas одновременно служат runtime валидаторами и источником типов
 
 ---
 
-## Docker & Local Development
+## Docker и локальная разработка
 
 ### docker-compose.yml (dev)
-Services:
-- `postgres` — PostgreSQL 16, port 5432
-- `minio` — photo storage, ports 9000/9001
-- `backend` — Spring Boot with hot reload via spring-devtools
-- `frontend` — Vite dev server with HMR
+Сервисы:
+- `postgres` — PostgreSQL 16, порт 5432
+- `minio` — хранилище фото, порты 9000/9001
+- `backend` — Spring Boot с hot reload через spring-devtools
+- `frontend` — Vite dev сервер с HMR
 
-### Environment Variables
-Backend (`.env` in `backend/`):
+### Переменные окружения
+Backend (`.env` в папке `backend/`):
 ```
 DB_URL=jdbc:postgresql://localhost:5432/recipebook
 DB_USERNAME=recipebook
 DB_PASSWORD=secret
-JWT_SECRET=<min-256-bit-secret>
+JWT_SECRET=<минимум 256-битный секрет>
 MINIO_ENDPOINT=http://localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 ```
-Frontend (`.env` in `frontend/`):
+Frontend (`.env` в папке `frontend/`):
 ```
 VITE_API_BASE_URL=http://localhost:8080/api/v1
 ```
 
-**Never commit `.env` files. Always provide `.env.example`.**
+**Никогда не коммить `.env` файлы. Всегда предоставляй `.env.example`.**
 
 ---
 
-## Git & CI Conventions
+## Git и CI соглашения
 
-### Branch Strategy
+### Стратегия веток
 ```
-main          # production-ready only
-develop       # integration branch
-feature/*     # new features
-fix/*         # bug fixes
+main          # только production-ready код
+develop       # интеграционная ветка
+feature/*     # новые фичи
+fix/*         # исправление багов
 ```
 
-### Commit Format (Conventional Commits)
+### Формат коммитов (Conventional Commits)
 ```
 feat(recipe): add photo upload endpoint
 fix(auth): correct JWT expiry calculation
@@ -300,30 +298,30 @@ test(recipe): add integration tests for RecipeService
 ```
 
 ### GitHub Actions CI
-On every PR to `develop` and `main`:
-1. Backend: `./mvnw verify` (includes Testcontainers tests)
+При каждом PR в `develop` и `main`:
+1. Backend: `./mvnw verify` (включая Testcontainers тесты)
 2. Frontend: `tsc --noEmit` + `eslint` + `vitest`
-3. Docker build check
+3. Проверка сборки Docker образа
 
 ---
 
-## What Claude Should Always Do
+## Что Claude должен делать всегда
 
-- Read this file before starting any task
-- Ask clarifying questions before writing code if requirements are ambiguous
-- Write tests alongside implementation, not after
-- Follow existing package structure — never create new top-level packages without discussion
-- Use constructor injection, never `@Autowired` on fields
-- Prefer immutable DTOs (Java records for response DTOs)
-- Never hardcode secrets, URLs, or environment-specific values
-- Run the project mentally through its layers before generating code
+- Читать этот файл перед началом любой задачи
+- Задавать уточняющие вопросы перед написанием кода если требования неоднозначны
+- Писать тесты вместе с реализацией, а не после
+- Следовать существующей структуре пакетов — никогда не создавать новые пакеты верхнего уровня без обсуждения
+- Использовать constructor injection, никогда `@Autowired` на полях
+- Предпочитать иммутабельные DTO (Java records для response DTO)
+- Никогда не хардкодить секреты, URL и environment-специфичные значения
+- Мысленно прогонять задачу через все слои проекта перед генерацией кода
 
-## What Claude Should Never Do
+## Что Claude никогда не должен делать
 
-- Use `@Data` on JPA entities (causes issues with Hibernate)
-- Use `FetchType.EAGER`
-- Skip Liquibase and use `ddl-auto: create` or `update` in any environment
-- Return raw entities from controllers
-- Use `var` where the type is not obvious from the right-hand side
-- Generate code without corresponding tests for service layer
-- Use `localStorage` for storing JWT (use httpOnly cookies or memory)
+- Использовать `@Data` на JPA entities (вызывает проблемы с Hibernate)
+- Использовать `FetchType.EAGER`
+- Пропускать Liquibase и использовать `ddl-auto: create` или `update` в любом окружении
+- Возвращать Entity напрямую из Controller
+- Использовать `var` там где тип не очевиден из правой части выражения
+- Генерировать код без соответствующих тестов для слоя Service
+- Хранить JWT в `localStorage` (использовать httpOnly cookies или память)
