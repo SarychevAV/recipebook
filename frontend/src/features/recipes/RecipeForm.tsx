@@ -229,8 +229,8 @@ export function RecipeForm({ initialValues, onSubmit, isSubmitting, submitLabel 
         <div className="space-y-3">
           {fields.map((field, index) => (
             <div key={field.id} className="flex gap-3 items-start">
-              <div className="flex-1 grid grid-cols-3 gap-2">
-                <div className="col-span-1">
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="col-span-2 sm:col-span-1">
                   <input
                     {...register(`ingredients.${index}.name`)}
                     placeholder="Ингредиент"
@@ -333,7 +333,7 @@ export function RecipeForm({ initialValues, onSubmit, isSubmitting, submitLabel 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-8 py-3 rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+          className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
         >
           {isSubmitting ? 'Сохраняем…' : submitLabel}
         </button>

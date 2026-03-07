@@ -47,23 +47,23 @@ export default function FeedPage() {
 
   return (
     <AppLayout>
-      <div className="px-8 py-8">
+      <div className="px-4 py-5 md:px-8 md:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5 md:mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Рецепты</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Рецепты</h1>
             <p className="text-sm text-gray-400 mt-0.5">Открывай блюда нашего сообщества</p>
           </div>
           <button
             onClick={() => setShowFilters(f => !f)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
               showFilters
                 ? 'bg-orange-50 border-orange-200 text-orange-600'
                 : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
             }`}
           >
             <FilterIcon />
-            Фильтры
+            <span className="hidden sm:inline">Фильтры</span>
           </button>
         </div>
 
@@ -140,7 +140,7 @@ export default function FeedPage() {
 
         {/* Results */}
         {isLoading && (
-          <div className="columns-2 lg:columns-3 gap-4">
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -167,7 +167,7 @@ export default function FeedPage() {
 
         {!isLoading && recipes.length > 0 && (
           <>
-            <div className="columns-2 lg:columns-3 gap-4">
+            <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
               {recipes.map(recipe => (
                 <div key={recipe.id} className="break-inside-avoid mb-4">
                   <RecipeCard recipe={recipe} />
