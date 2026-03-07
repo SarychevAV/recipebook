@@ -31,6 +31,11 @@ server:
   servlet:
     context-path: /
 
+admin:
+  email: ${ADMIN_EMAIL:admin@recipebook.com}
+  password: ${ADMIN_PASSWORD:admin123}
+  username: ${ADMIN_USERNAME:admin}
+
 jwt:
   secret: ${JWT_SECRET}
   expiration-ms: 86400000      # 24h

@@ -11,6 +11,8 @@ export interface IngredientResponse {
   orderIndex: number;
 }
 
+export type RecipeStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED';
+
 export interface RecipeSummaryDto {
   id: string;
   title: string;
@@ -22,6 +24,8 @@ export interface RecipeSummaryDto {
   ownerId: string;
   tags: TagResponse[];
   createdAt: string;
+  status: RecipeStatus;
+  rejectionReason?: string;
 }
 
 export interface RecipeDto {
@@ -38,6 +42,8 @@ export interface RecipeDto {
   ingredients: IngredientResponse[];
   createdAt: string;
   updatedAt: string;
+  status: RecipeStatus;
+  rejectionReason?: string;
 }
 
 export interface PagedResponse<T> {

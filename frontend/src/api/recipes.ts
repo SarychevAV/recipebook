@@ -36,3 +36,26 @@ export const uploadRecipePhoto = (id: string, file: File): Promise<ApiResponse<R
   formData.append('file', file);
   return api.post(`/recipes/${id}/photos`, formData).then(r => r.data);
 };
+
+export const getMyRecipes = (
+  params?: RecipeQueryParams,
+): Promise<ApiResponse<PagedResponse<RecipeSummaryDto>>> =>
+  api.get('/recipes/my', { params }).then(r => r.data);
+
+export const submitRecipeForReview = (id: string): Promise<ApiResponse<RecipeDto>> =>
+  api.post(`/recipes/${id}/submit`).then(r => r.data);
+
+// Admin API
+export const getPendingRecipes = (
+  params?: RecipeQueryParams,
+): Promise<ApiResponse<PagedResponse<RecipeSummaryDto>>> =>
+  api.get('/admin/recipes', { params }).then(r => r.data);
+
+export const approveRecipe = (id: string): Promise<ApiResponse<RecipeSummaryDto>> =>
+  api.post(`/admin/recipes/${id}/approve`).then(r => r.data);
+
+export const rejectRecipe = (
+  id: string,
+  reason: string,
+): Promise<ApiResponse<RecipeSummaryDto>> =>
+  api.post(`/admin/recipes/${id}/reject`, { reason }).then(r => r.data);

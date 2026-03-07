@@ -6,6 +6,11 @@ import {
   updateRecipe,
   deleteRecipe,
   uploadRecipePhoto,
+  getMyRecipes,
+  submitRecipeForReview,
+  getPendingRecipes,
+  approveRecipe,
+  rejectRecipe,
 } from '../api/recipes';
 import { getTags } from '../api/tags';
 import type {
@@ -73,6 +78,54 @@ export function useUploadRecipePhoto(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipes'] });
       qc.invalidateQueries({ queryKey: ['recipe', id] });
+    },
+  });
+}
+
+export function useMyRecipes(params?: RecipeQueryParams) {
+  return useQuery({
+    queryKey: ['my-recipes', params],
+    queryFn: () => getMyRecipes(params),
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+export function useSubmitForReview(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => submitRecipeForReview(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-recipes'] });
+      qc.invalidateQueries({ queryKey: ['recipe', id] });
+    },
+  });
+}
+
+export function usePendingRecipes(params?: RecipeQueryParams) {
+  return useQuery({
+    queryKey: ['admin-recipes', params],
+    queryFn: () => getPendingRecipes(params),
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useApproveRecipe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => approveRecipe(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-recipes'] });
+      qc.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+}
+
+export function useRejectRecipe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectRecipe(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-recipes'] });
     },
   });
 }

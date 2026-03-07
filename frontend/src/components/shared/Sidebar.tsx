@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 
 function HomeIcon() {
@@ -46,6 +46,14 @@ function BookOpenIcon() {
   );
 }
 
+function ShieldIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
 function SlidersIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -62,9 +70,12 @@ function SlidersIcon() {
   );
 }
 
-const NAV_ITEMS = [
+const PUBLIC_NAV_ITEMS = [
   { label: 'Лента',           path: '/',             Icon: HomeIcon },
   { label: 'Открыть',         path: '/explore',      Icon: CompassIcon },
+];
+
+const AUTH_NAV_ITEMS = [
   { label: 'Новый рецепт',    path: '/recipes/new',  Icon: PlusCircleIcon },
   { label: 'Сохранённые',     path: '/saved',        Icon: BookmarkIcon },
   { label: 'Мои рецепты',     path: '/my-recipes',   Icon: BookOpenIcon },
@@ -72,7 +83,16 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, clearAuth } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, clearAuth } = useAuth();
+
+  const adminNavItems = user?.role === 'ADMIN'
+    ? [{ label: 'Модерация', path: '/admin/moderation', Icon: ShieldIcon }]
+    : [];
+
+  const navItems = isAuthenticated
+    ? [...PUBLIC_NAV_ITEMS, ...AUTH_NAV_ITEMS, ...adminNavItems]
+    : PUBLIC_NAV_ITEMS;
 
   return (
     <aside className="w-56 shrink-0 flex flex-col h-full bg-white border-r border-gray-100">
@@ -80,7 +100,6 @@ export function Sidebar() {
       <div className="px-5 pt-6 pb-4">
         <Link to="/" className="flex items-center gap-2.5">
           <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500">
-            {/* Мандарин */}
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="12" cy="15" r="7" />
               <path strokeLinecap="round" d="M12 8V5" />
@@ -93,7 +112,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ label, path, Icon }) => {
+        {navItems.map(({ label, path, Icon }) => {
           const active =
             path === '/'
               ? location.pathname === '/'
@@ -119,41 +138,59 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="mt-auto border-t border-gray-100">
-        <div className="px-3 py-3">
-          <Link
-            to="/preferences"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
-            <span className="text-gray-400">
-              <SlidersIcon />
-            </span>
-            Настройки
-          </Link>
-        </div>
+        {isAuthenticated ? (
+          <>
+            <div className="px-3 py-3">
+              <Link
+                to="/preferences"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                <span className="text-gray-400">
+                  <SlidersIcon />
+                </span>
+                Настройки
+              </Link>
+            </div>
 
-        {/* User profile */}
-        <div className="px-4 py-3 border-t border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-              <span className="text-xs font-bold text-orange-600">
-                {user?.username.slice(0, 2).toUpperCase() ?? 'U'}
-              </span>
+            <div className="px-4 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-orange-600">
+                    {user?.username.slice(0, 2).toUpperCase() ?? 'U'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 truncate">{user?.username}</p>
+                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                </div>
+                <button
+                  onClick={clearAuth}
+                  title="Выйти"
+                  className="shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-900 truncate">{user?.username}</p>
-              <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-            </div>
+          </>
+        ) : (
+          <div className="px-4 py-4 space-y-2">
             <button
-              onClick={clearAuth}
-              title="Выйти"
-              className="shrink-0 text-gray-300 hover:text-gray-500 transition-colors"
+              onClick={() => navigate('/login')}
+              className="w-full py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
-              </svg>
+              Войти
+            </button>
+            <button
+              onClick={() => navigate('/register')}
+              className="w-full py-2 rounded-xl bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+            >
+              Зарегистрироваться
             </button>
           </div>
-        </div>
+        )}
       </div>
     </aside>
   );

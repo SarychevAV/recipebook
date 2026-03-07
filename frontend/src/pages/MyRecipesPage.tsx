@@ -1,17 +1,106 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/shared/AppLayout';
-import { RecipeCard } from '../features/recipes/RecipeCard';
-import { useRecipes } from '../hooks/useRecipes';
-import { useAuth } from '../store/authStore';
+import { useMyRecipes, useSubmitForReview } from '../hooks/useRecipes';
+import { getErrorMessage } from '../lib/utils';
+import type { RecipeSummaryDto, RecipeStatus } from '../types/recipe';
+
+const STATUS_CONFIG: Record<RecipeStatus, { label: string; className: string }> = {
+  DRAFT:          { label: 'Черновик',      className: 'bg-gray-100 text-gray-600' },
+  PENDING_REVIEW: { label: 'На проверке',   className: 'bg-amber-100 text-amber-700' },
+  PUBLISHED:      { label: 'Опубликован',   className: 'bg-green-100 text-green-700' },
+  REJECTED:       { label: 'Отклонён',      className: 'bg-red-100 text-red-600' },
+};
+
+function StatusBadge({ status }: { status: RecipeStatus }) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function RecipeRow({ recipe }: { recipe: RecipeSummaryDto }) {
+  const [error, setError] = useState('');
+  const submitMutation = useSubmitForReview(recipe.id);
+
+  async function handleSubmit() {
+    setError('');
+    try {
+      await submitMutation.mutateAsync();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  const canSubmit = recipe.status === 'DRAFT' || recipe.status === 'REJECTED';
+  const canEdit = recipe.status !== 'PENDING_REVIEW';
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 flex gap-4">
+      {/* Thumbnail */}
+      <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+        {recipe.photoUrl ? (
+          <img src={recipe.photoUrl} alt={recipe.title} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-2xl select-none">🍽️</span>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <Link
+            to={`/recipes/${recipe.id}`}
+            className="font-semibold text-gray-900 text-sm hover:text-orange-600 transition-colors truncate"
+          >
+            {recipe.title}
+          </Link>
+          <StatusBadge status={recipe.status} />
+        </div>
+
+        {recipe.description && (
+          <p className="text-xs text-gray-400 line-clamp-1 mb-2">{recipe.description}</p>
+        )}
+
+        {recipe.status === 'REJECTED' && recipe.rejectionReason && (
+          <p className="text-xs text-red-500 bg-red-50 rounded-lg px-2.5 py-1.5 mb-2">
+            Причина отклонения: {recipe.rejectionReason}
+          </p>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-500 mb-2">{error}</p>
+        )}
+
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Link
+              to={`/recipes/${recipe.id}/edit`}
+              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            >
+              Редактировать
+            </Link>
+          )}
+          {canSubmit && (
+            <button
+              onClick={handleSubmit}
+              disabled={submitMutation.isPending}
+              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
+            >
+              {submitMutation.isPending ? 'Отправляем…' : 'Отправить на проверку'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function MyRecipesPage() {
-  const { user } = useAuth();
-  // Filter by current user via search by username (backend supports q param)
-  // Since the API doesn't have a "my recipes" endpoint, we use the general search
-  // and show only recipes owned by the current user on the client side
-  const { data, isLoading, isError } = useRecipes({ size: 100 });
-  const allRecipes = data?.data.content ?? [];
-  const myRecipes = allRecipes.filter(r => r.ownerId === user?.id);
+  const { data, isLoading, isError } = useMyRecipes();
+  const recipes = data?.data.content ?? [];
 
   return (
     <AppLayout>
@@ -35,9 +124,9 @@ export default function MyRecipesPage() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-64 rounded-2xl bg-gray-100 animate-pulse" />
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />
             ))}
           </div>
         )}
@@ -48,7 +137,7 @@ export default function MyRecipesPage() {
           </div>
         )}
 
-        {!isLoading && !isError && myRecipes.length === 0 && (
+        {!isLoading && !isError && recipes.length === 0 && (
           <div className="text-center py-20">
             <p className="text-5xl mb-4">👨‍🍳</p>
             <p className="text-base font-medium text-gray-700 mb-2">Рецептов пока нет</p>
@@ -64,10 +153,10 @@ export default function MyRecipesPage() {
           </div>
         )}
 
-        {!isLoading && myRecipes.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {myRecipes.map(recipe => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
+        {!isLoading && recipes.length > 0 && (
+          <div className="space-y-3">
+            {recipes.map(recipe => (
+              <RecipeRow key={recipe.id} recipe={recipe} />
             ))}
           </div>
         )}

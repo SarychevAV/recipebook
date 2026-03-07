@@ -42,6 +42,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(pd);
     }
 
+    @ExceptionHandler(InvalidOperationException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidOperation(InvalidOperationException ex) {
+        log.warn("Invalid operation: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Operation");
+        pd.setType(URI.create("/errors/invalid-operation"));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(pd);
+    }
+
     @ExceptionHandler(UnauthorizedAccessException.class)
     public ResponseEntity<ProblemDetail> handleUnauthorized(UnauthorizedAccessException ex) {
         log.warn("Unauthorized access attempt: {}", ex.getMessage());
