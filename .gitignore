@@ -23,5 +23,5 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Docker
+# Docker — personal local overrides (dev/prod файлы коммитятся)
 docker-compose.override.yml
