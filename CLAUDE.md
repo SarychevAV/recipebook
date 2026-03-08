@@ -1,4 +1,4 @@
-# CLAUDE.md — recipebook
+# CLAUDE.md — Мандаринка (recipebook)
 
 Это главный файл-инструкция для Claude Code. Читай его полностью перед началом любой задачи.
 
@@ -6,15 +6,22 @@
 
 ## О проекте
 
-**recipebook** — веб-приложение для сохранения и публикации рецептов.
+**Мандаринка** — веб-приложение для сохранения и публикации кулинарных рецептов.
 Гости могут просматривать публичные рецепты без регистрации. Авторизованные пользователи могут создавать, редактировать и управлять своими рецептами с фотографиями.
+
+Сайт: **darink.ru**
+Аудитория: мобильные пользователи в приоритете (375px+).
 
 **Структура монорепо:**
 ```
 recipebook/
-├── backend/          # Spring Boot 3 + Java 21
-├── frontend/         # React + TypeScript + Vite
-├── docker-compose.yml
+├── backend/                  # Spring Boot 3 + Java 21
+├── frontend/                 # React + TypeScript + Vite
+├── docs/design/              # Скриншоты дизайн-референсов
+├── .github/workflows/
+│   └── deploy.yml            # Автодеплой при push в main
+├── docker-compose.yml        # Локальная разработка
+├── docker-compose.prod.yml   # Production
 └── CLAUDE.md
 ```
 
@@ -26,12 +33,12 @@ recipebook/
 - **Java 21** (используй records, sealed classes, pattern matching там где уместно)
 - **Spring Boot 3.x**
 - **Spring Security 6** + JWT (stateless, без сессий)
-- **Spring Data JPA** + **PostgreSQL**
+- **Spring Data JPA** + **PostgreSQL 16**
 - **Liquibase** для миграций БД
 - **MapStruct** для маппинга DTO
 - **Lombok** (только `@Builder`, `@Getter`, `@Slf4j` — не используй `@Data` на entities)
 - **Testcontainers** + **JUnit 5** + **MockMvc** для тестов
-- **MinIO** (S3-совместимое хранилище) для фото в dev; S3 в prod
+- **MinIO** (S3-совместимое хранилище) для фото
 
 ### Frontend
 - **React 18** + **TypeScript** (strict mode)
@@ -43,9 +50,10 @@ recipebook/
 - **Axios** с interceptors для HTTP запросов
 
 ### Инфраструктура
-- **Docker + Docker Compose** для локальной разработки
-- **Railway** для production хостинга
-- **GitHub Actions** для CI
+- **Docker + Docker Compose** (два файла — dev и prod)
+- **Timeweb Cloud VPS** — Ubuntu 22.04, 2GB RAM, IP: 147.45.153.120
+- **nginx** — реверс-прокси, слушает 80/443
+- **GitHub Actions** для автодеплоя при push в `main`
 
 ---
 
@@ -72,7 +80,8 @@ com.recipebook/
 │   └── dto/
 ├── ingredient/
 ├── tag/
-└── storage/              # Абстракция для загрузки фото
+├── storage/              # Абстракция для загрузки фото в MinIO
+└── ai/                   # AI функции (Spring AI + Ollama) — планируется
 ```
 
 ### Правила слоёв
@@ -84,7 +93,6 @@ com.recipebook/
 
 ### Соглашения по Entity
 ```java
-// Всегда используй этот базовый класс для entities
 @MappedSuperclass
 public abstract class BaseEntity {
     @Id
@@ -105,19 +113,19 @@ public abstract class BaseEntity {
 
 ### Соглашения по API
 ```
-GET    /api/v1/recipes              # публичный, с пагинацией
-GET    /api/v1/recipes/{id}         # публичный
-POST   /api/v1/recipes              # требует авторизации
-PUT    /api/v1/recipes/{id}         # требует авторизации, только владелец
-DELETE /api/v1/recipes/{id}         # требует авторизации, только владелец
-POST   /api/v1/recipes/{id}/photos  # требует авторизации, multipart
+GET    /api/v1/recipes                  # публичный, с пагинацией
+GET    /api/v1/recipes/{id}             # публичный
+POST   /api/v1/recipes                  # требует авторизации
+PUT    /api/v1/recipes/{id}             # требует авторизации, только владелец
+DELETE /api/v1/recipes/{id}             # требует авторизации, только владелец
+POST   /api/v1/recipes/{id}/photos      # требует авторизации, multipart
+POST   /api/v1/recipes/{id}/favorite    # требует авторизации
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
 GET    /api/v1/users/me
 ```
 
 ### Формат ответов
-Всегда оборачивай ответы в `ApiResponse<T>`:
 ```json
 {
   "data": { ... },
@@ -125,7 +133,7 @@ GET    /api/v1/users/me
   "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
-Ошибки следуют RFC 7807 Problem Details:
+Ошибки по RFC 7807 Problem Details:
 ```json
 {
   "type": "/errors/not-found",
@@ -136,40 +144,33 @@ GET    /api/v1/users/me
 ```
 
 ### Обработка исключений
-- Все исключения проходят через `@ControllerAdvice GlobalExceptionHandler`
-- Создавай доменные исключения: `RecipeNotFoundException`, `UnauthorizedAccessException`
+- Все исключения → `@ControllerAdvice GlobalExceptionHandler`
+- Доменные исключения: `RecipeNotFoundException`, `UnauthorizedAccessException`
 - Никогда не возвращай 500 для ошибок бизнес-логики
 - Логируй через `@Slf4j` — ERROR для неожиданных ошибок, WARN для нарушений бизнес-правил
 
 ### Правила безопасности
-- JWT секрет только из переменной окружения `JWT_SECRET` (никогда не хардкодить)
+- JWT секрет только из `JWT_SECRET` переменной окружения
 - Время жизни токенов: 24ч access, 7д refresh
 - Публичные endpoints: `GET /api/v1/recipes/**`, `POST /api/v1/auth/**`
-- Все остальные endpoints требуют авторизации
 - Проверка владельца ресурса — в слое Service, не в Controller
 
 ### Стандарты тестирования
 - Unit тесты для каждого метода Service
 - Integration тесты с Testcontainers для репозиториев и контроллеров
-- Именование тестов: `methodName_whenCondition_thenExpectedResult`
+- Именование: `methodName_whenCondition_thenExpectedResult`
 - Минимальное покрытие: 80% для слоя Service
-- Используй `@Sql` аннотации или builders для тестовых данных, никогда не делись мутабельным состоянием между тестами
 
 ```java
-// Пример структуры теста
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
 class RecipeServiceTest {
-
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 
     @Test
     void createRecipe_whenUserAuthenticated_thenRecipeSaved() { ... }
-
-    @Test
-    void createRecipe_whenUserNotOwner_thenThrowsUnauthorized() { ... }
 }
 ```
 
@@ -182,8 +183,9 @@ backend/src/main/resources/db/changelog/
 ├── V3__create_ingredients.sql
 └── V4__create_tags.sql
 ```
-- Один файл на одно логическое изменение, никогда не редактируй существующие файлы миграций
-- Всегда добавляй rollback скрипты
+- Один файл на одно логическое изменение
+- Никогда не редактировать существующие файлы миграций
+- Всегда добавлять rollback скрипты
 
 ---
 
@@ -202,37 +204,68 @@ frontend/src/
 │   └── profile/      # Профиль пользователя, мои рецепты
 ├── hooks/            # Кастомные hooks
 ├── lib/              # utils, zod schemas, константы
-├── pages/            # Компоненты уровня роута, только тонкие обёртки
-├── router/           # Описание роутов, protected route обёртка
-├── store/            # Auth состояние (Zustand или Context)
-└── types/            # Общие TypeScript типы и интерфейсы
+├── pages/            # Тонкие обёртки уровня роута
+├── router/           # Описание роутов, ProtectedRoute
+├── store/            # Auth состояние
+└── types/            # Общие TypeScript типы
+```
+
+### UI/UX соглашения (мобиль в приоритете)
+
+**Дизайн система:**
+- Акцентный цвет: `#F97316` (orange-500)
+- Фон страниц: `#F9FAFB` (gray-50)
+- Карточки: `rounded-2xl`, `shadow-sm`, белый фон
+- Шрифт: Inter
+- Всё должно корректно отображаться от 375px
+
+**Навигация:**
+- Bottom Tab Bar — основная навигация на мобиле
+- Пункты: Лента (🏠), Поиск (🔍), Создать (➕), Мои рецепты (📖), Профиль (👤)
+- Активный пункт — оранжевый `#F97316`
+- Кнопка "Создать" — крупнее остальных, оранжевый фон
+
+**Обязательные правила UI:**
+- Теги/фильтры — горизонтальный скролл в одну строку, без переносов
+- Автор рецепта — показывать `username`, никогда не `email`
+- Единицы измерения — строчными: "г", "мл", "кг", "л", "шт"
+- Breadcrumbs — обычный регистр, не КАПСЛОК
+- Кнопки "Редактировать/Удалить" — в меню "···" (три точки), не в основном контенте
+- Placeholder без фото — нейтральный серый градиент, не жёлтый
+- Форма создания рецепта — многошаговая (4 шага) с прогресс-баром
+
+**Ингредиент в форме — одна строка:**
+```
+[Название (flex-grow)] [Кол-во (80px)] [Единица dropdown (70px)] [🗑️]
+```
+Единицы в dropdown: г, кг, мл, л, шт, ст.л, ч.л, по вкусу
+
+**Статистика рецепта с иконками:**
+```
+⏱ 30 мин   👥 2 порции   🥕 3 ингредиента
 ```
 
 ### Правила компонентов
 - Один компонент — один файл
 - Компоненты фич живут в `features/`, не в `components/`
-- Pages — тонкие обёртки, логика живёт в hooks и features
-- `React.FC` использовать редко — предпочитай обычные function declarations
-- Все формы используют React Hook Form + Zod валидацию
+- Pages — тонкие обёртки, логика в hooks и features
+- Предпочитай обычные function declarations вместо `React.FC`
+- Все формы — React Hook Form + Zod
+- URL для API — всегда относительные (`/api/v1/...`), никогда не хардкодить домен или IP
 
 ### Слой API
 ```typescript
-// api/recipes.ts — всегда типизируй request и response
 export const getRecipes = (params: RecipeQueryParams): Promise<PagedResponse<RecipeDto>> =>
   api.get('/recipes', { params }).then(r => r.data);
-
-export const createRecipe = (data: CreateRecipeRequest): Promise<RecipeDto> =>
-  api.post('/recipes', data).then(r => r.data);
 ```
 
-### Соглашения TanStack Query
+### TanStack Query
 ```typescript
-// hooks/useRecipes.ts
 export const useRecipes = (params: RecipeQueryParams) =>
   useQuery({
     queryKey: ['recipes', params],
     queryFn: () => getRecipes(params),
-    staleTime: 1000 * 60 * 5, // 5 минут для публичных данных
+    staleTime: 1000 * 60 * 5,
   });
 
 export const useCreateRecipe = () =>
@@ -242,86 +275,127 @@ export const useCreateRecipe = () =>
   });
 ```
 
-### Правила TypeScript
-- `strict: true` в tsconfig — без исключений
-- Никакого `any` — используй `unknown` и type guards если нужно
-- Все типы ответов API должны точно соответствовать backend DTO
-- Zod schemas одновременно служат runtime валидаторами и источником типов
+### TypeScript
+- `strict: true` — без исключений
+- Никакого `any` — используй `unknown` и type guards
+- Zod schemas = runtime валидация + источник типов
 
 ---
 
-## Docker и локальная разработка
+## Docker
 
-### docker-compose.yml (dev)
-Сервисы:
-- `postgres` — PostgreSQL 16, порт 5432
-- `minio` — хранилище фото, порты 9000/9001
-- `backend` — Spring Boot с hot reload через spring-devtools
-- `frontend` — Vite dev сервер с HMR
+**Два файла — используй правильный:**
 
-### Переменные окружения
-Backend (`.env` в папке `backend/`):
+| | dev | prod |
+|---|---|---|
+| Команда | `docker compose up -d` | `docker compose -f docker-compose.prod.yml up -d --build` |
+| Frontend | Vite dev + HMR | nginx со статическим билдом |
+| Порты БД | открыты наружу | только внутри Docker сети |
+| Env | дефолтные dev значения | из `backend/.env` |
+
+---
+
+## Деплой
+
+**Сервер:** Timeweb Cloud VPS
+**Путь:** `/home/deploy/recipebook`
+**Пользователь:** `deploy`
+
+**nginx** (`/etc/nginx/sites-available/recipebook`):
+- `/` → `http://localhost:3000` (frontend контейнер)
+- `/api` → `http://localhost:8080` (backend контейнер)
+
+**Ручной деплой:**
+```bash
+ssh deploy@147.45.153.120
+cd /home/deploy/recipebook
+git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build
+docker image prune -f
 ```
-DB_URL=jdbc:postgresql://localhost:5432/recipebook
+
+**Автодеплой:** GitHub Actions при push в `main`.
+
+---
+
+## Переменные окружения
+
+`backend/.env` (локально):
+```
+DB_URL=jdbc:postgresql://postgres:5432/recipebook
 DB_USERNAME=recipebook
 DB_PASSWORD=secret
-JWT_SECRET=<минимум 256-битный секрет>
-MINIO_ENDPOINT=http://localhost:9000
+JWT_SECRET=dev-secret-key-minimum-256-bits
+MINIO_ENDPOINT=http://minio:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
-```
-Frontend (`.env` в папке `frontend/`):
-```
-VITE_API_BASE_URL=http://localhost:8080/api/v1
+MINIO_PUBLIC_URL=http://localhost:9000
+ADMIN_EMAIL=admin@recipebook.com
+ADMIN_PASSWORD=admin123
+ADMIN_USERNAME=admin
 ```
 
-**Никогда не коммить `.env` файлы. Всегда предоставляй `.env.example`.**
+`frontend/.env` (локально):
+```
+VITE_API_BASE_URL=/api/v1
+```
+
+**Никогда не коммить `.env`. Всегда поддерживай `.env.example` актуальным.**
 
 ---
 
-## Git и CI соглашения
+## Git соглашения
 
-### Стратегия веток
 ```
-main          # только production-ready код
+main          # production-ready → автодеплой
 develop       # интеграционная ветка
 feature/*     # новые фичи
 fix/*         # исправление багов
 ```
 
-### Формат коммитов (Conventional Commits)
+Формат коммитов:
 ```
 feat(recipe): add photo upload endpoint
+fix(ui): replace tags wrap with horizontal scroll
 fix(auth): correct JWT expiry calculation
 refactor(user): extract UserMapper to separate class
 test(recipe): add integration tests for RecipeService
 ```
 
-### GitHub Actions CI
-При каждом PR в `develop` и `main`:
-1. Backend: `./mvnw verify` (включая Testcontainers тесты)
-2. Frontend: `tsc --noEmit` + `eslint` + `vitest`
-3. Проверка сборки Docker образа
+---
+
+## AI интеграция (планируется)
+
+Spring AI + Ollama — всё локально, без внешних API:
+- LLM: llama3.2 через Ollama
+- Эмбеддинги: nomic-embed-text
+- Векторное хранилище: PGVector (расширение PostgreSQL)
+- Пакет: `com.recipebook.ai`
+- При сохранении APPROVED рецепта → индексировать через `RecipeIndexingService`
 
 ---
 
 ## Что Claude должен делать всегда
 
 - Читать этот файл перед началом любой задачи
-- Задавать уточняющие вопросы перед написанием кода если требования неоднозначны
-- Писать тесты вместе с реализацией, а не после
-- Следовать существующей структуре пакетов — никогда не создавать новые пакеты верхнего уровня без обсуждения
+- Задавать уточняющие вопросы если требования неоднозначны
+- Писать тесты вместе с реализацией, не после
+- Следовать существующей структуре пакетов
 - Использовать constructor injection, никогда `@Autowired` на полях
 - Предпочитать иммутабельные DTO (Java records для response DTO)
 - Никогда не хардкодить секреты, URL и environment-специфичные значения
-- Мысленно прогонять задачу через все слои проекта перед генерацией кода
+- При изменении UI — проверять мобильный вид в первую очередь (375px)
+- Мысленно прогонять задачу через все слои перед генерацией кода
 
 ## Что Claude никогда не должен делать
 
-- Использовать `@Data` на JPA entities (вызывает проблемы с Hibernate)
+- Использовать `@Data` на JPA entities
 - Использовать `FetchType.EAGER`
-- Пропускать Liquibase и использовать `ddl-auto: create` или `update` в любом окружении
+- Пропускать Liquibase и использовать `ddl-auto: create` или `update`
 - Возвращать Entity напрямую из Controller
-- Использовать `var` там где тип не очевиден из правой части выражения
-- Генерировать код без соответствующих тестов для слоя Service
-- Хранить JWT в `localStorage` (использовать httpOnly cookies или память)
+- Использовать `var` там где тип не очевиден из правой части
+- Генерировать код без тестов для слоя Service
+- Хранить JWT в `localStorage`
+- Показывать `email` пользователя в UI — только `username`
+- Хардкодить домен, IP или порт во frontend коде
+- На сервере запускать `docker compose up` без `-f docker-compose.prod.yml`
