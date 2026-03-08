@@ -40,7 +40,7 @@ function RecipeRow({ recipe }: { recipe: RecipeSummaryDto }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 flex gap-4">
       {/* Thumbnail */}
-      <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+      <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
         {recipe.photoUrl ? (
           <img src={recipe.photoUrl} alt={recipe.title} className="w-full h-full object-cover" />
         ) : (

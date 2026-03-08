@@ -1,16 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { RecipeSummaryDto } from '../../types/recipe';
+import { useAuth } from '../../store/authStore';
+import { useFavoriteRecipe } from '../../hooks/useRecipes';
 
-const GRADIENTS = [
-  'from-orange-400 to-rose-500',
-  'from-amber-400 to-orange-500',
-  'from-red-400 to-pink-500',
-  'from-yellow-400 to-amber-500',
-  'from-teal-400 to-cyan-500',
-  'from-green-400 to-emerald-500',
-];
-
-const HEIGHTS = ['h-48', 'h-64', 'h-80'] as const;
+// Desktop: 2 sizes. Mobile: uniform h-48.
+const DESKTOP_HEIGHTS = ['sm:h-56', 'sm:h-80'] as const;
 
 function titleHash(title: string) {
   let n = 0;
@@ -18,12 +12,8 @@ function titleHash(title: string) {
   return n;
 }
 
-function pickGradient(title: string) {
-  return GRADIENTS[titleHash(title) % GRADIENTS.length];
-}
-
 function pickHeight(title: string) {
-  return HEIGHTS[titleHash(title) % HEIGHTS.length];
+  return DESKTOP_HEIGHTS[titleHash(title) % DESKTOP_HEIGHTS.length];
 }
 
 function ClockIcon() {
@@ -35,20 +25,40 @@ function ClockIcon() {
   );
 }
 
+function BookmarkIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 interface Props {
   recipe: RecipeSummaryDto;
 }
 
 export function RecipeCard({ recipe }: Props) {
-  const gradient = pickGradient(recipe.title);
   const height = pickHeight(recipe.title);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const favMutation = useFavoriteRecipe();
+
+  function handleFavorite(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    favMutation.mutate(recipe.id);
+  }
 
   return (
     <Link
       to={`/recipes/${recipe.id}`}
-      className={`group relative block ${height} rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow`}
+      className={`group relative block h-48 ${height} rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow`}
     >
-      {/* Background: photo or gradient */}
+      {/* Background: photo or neutral gray placeholder */}
       {recipe.photoUrl ? (
         <img
           src={recipe.photoUrl}
@@ -56,18 +66,27 @@ export function RecipeCard({ recipe }: Props) {
           className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
         />
       ) : (
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}>
-          <div className="absolute inset-0 flex items-center justify-center opacity-20">
-            <span className="text-8xl select-none">🍽️</span>
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-8xl select-none opacity-20">🍽️</span>
           </div>
         </div>
       )}
 
-      {/* Cooking time badge */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white text-xs font-medium px-2.5 py-1 rounded-full z-10">
+      {/* Cooking time badge — top left */}
+      <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white text-xs font-medium px-2.5 py-1 rounded-full z-10">
         <ClockIcon />
         <span>{recipe.cookingTimeMinutes} мин</span>
       </div>
+
+      {/* Favorite button — top right */}
+      <button
+        onClick={handleFavorite}
+        className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-orange-500/80 active:scale-90 transition-all"
+        aria-label="Сохранить в избранное"
+      >
+        <BookmarkIcon />
+      </button>
 
       {/* Bottom gradient overlay */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-4 px-4 z-10">

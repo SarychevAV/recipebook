@@ -59,3 +59,6 @@ export const rejectRecipe = (
   reason: string,
 ): Promise<ApiResponse<RecipeSummaryDto>> =>
   api.post(`/admin/recipes/${id}/reject`, { reason }).then(r => r.data);
+
+export const favoriteRecipe = (id: string): Promise<void> =>
+  api.post(`/recipes/${id}/favorite`).then(r => r.data);

@@ -11,6 +11,7 @@ import {
   getPendingRecipes,
   approveRecipe,
   rejectRecipe,
+  favoriteRecipe,
 } from '../api/recipes';
 import { getTags } from '../api/tags';
 import type {
@@ -127,5 +128,11 @@ export function useRejectRecipe() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-recipes'] });
     },
+  });
+}
+
+export function useFavoriteRecipe() {
+  return useMutation({
+    mutationFn: (id: string) => favoriteRecipe(id),
   });
 }

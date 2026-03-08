@@ -111,10 +111,10 @@ export default function FeedPage() {
 
         {/* Tag chips */}
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
             <button
               onClick={() => { setActiveTagId(undefined); setPage(0); }}
-              className={`text-sm font-medium px-4 py-1.5 rounded-full border transition-colors ${
+              className={`shrink-0 text-sm font-medium px-4 py-1.5 rounded-full border transition-colors ${
                 !activeTagId
                   ? 'bg-orange-500 text-white border-orange-500'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
@@ -126,7 +126,7 @@ export default function FeedPage() {
               <button
                 key={tag.id}
                 onClick={() => { setActiveTagId(activeTagId === tag.id ? undefined : tag.id); setPage(0); }}
-                className={`text-sm font-medium px-4 py-1.5 rounded-full border transition-colors ${
+                className={`shrink-0 text-sm font-medium px-4 py-1.5 rounded-full border transition-colors ${
                   activeTagId === tag.id
                     ? 'bg-orange-500 text-white border-orange-500'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
