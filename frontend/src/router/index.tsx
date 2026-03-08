@@ -11,6 +11,7 @@ const CreateRecipePage = lazy(() => import('../pages/CreateRecipePage'));
 const EditRecipePage = lazy(() => import('../pages/EditRecipePage'));
 const MyRecipesPage = lazy(() => import('../pages/MyRecipesPage'));
 const AdminModerationPage = lazy(() => import('../pages/AdminModerationPage'));
+const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 
 function PageLoader() {
   return (
@@ -95,6 +96,14 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <MyRecipesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/profile',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ProfilePage />
           </Suspense>
         ),
       },

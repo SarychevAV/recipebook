@@ -2,23 +2,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { RecipeDto } from '../../types/recipe';
 import { useAuth } from '../../store/authStore';
-import { useDeleteRecipe, useSubmitForReview } from '../../hooks/useRecipes';
+import { useDeleteRecipe, useSubmitForReview, useFavoriteRecipe } from '../../hooks/useRecipes';
 import { getErrorMessage } from '../../lib/utils';
-
-const GRADIENTS = [
-  'from-orange-400 to-rose-500',
-  'from-amber-400 to-orange-500',
-  'from-red-400 to-pink-500',
-  'from-yellow-400 to-amber-500',
-  'from-teal-400 to-cyan-500',
-  'from-green-400 to-emerald-500',
-];
-
-function pickGradient(title: string) {
-  let n = 0;
-  for (let i = 0; i < title.length; i++) n += title.charCodeAt(i);
-  return GRADIENTS[n % GRADIENTS.length];
-}
 
 function parseSteps(instructions: string): string[] {
   return instructions
@@ -27,20 +12,61 @@ function parseSteps(instructions: string): string[] {
     .filter(Boolean);
 }
 
+function BookmarkIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function DotsIcon() {
+  return (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  );
+}
+
 interface Props {
   recipe: RecipeDto;
 }
 
 export function RecipeDetail({ recipe }: Props) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const deleteMutation = useDeleteRecipe();
   const submitMutation = useSubmitForReview(recipe.id);
+  const favMutation = useFavoriteRecipe();
+
   const [deleteError, setDeleteError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
   const isOwner = user?.id === recipe.ownerId;
-  const gradient = pickGradient(recipe.title);
   const steps = parseSteps(recipe.instructions);
   const isPending = recipe.status === 'PENDING_REVIEW';
   const isDraft = recipe.status === 'DRAFT';
@@ -64,19 +90,27 @@ export function RecipeDetail({ recipe }: Props) {
     }
   }
 
+  function handleFavorite() {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    favMutation.mutate(recipe.id);
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-5 md:px-6 md:py-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-gray-400 mb-6">
         <Link to="/" className="hover:text-orange-500 transition-colors">Лента</Link>
         <span>›</span>
-        <span className="text-gray-600 font-medium uppercase tracking-wide">{recipe.title}</span>
+        <span className="text-gray-600 font-medium">{recipe.title}</span>
       </div>
 
       {/* Hero row */}
       <div className="flex flex-col lg:flex-row gap-8 mb-10">
         {/* Cover image */}
-        <div className={`relative lg:w-5/12 h-72 lg:h-auto rounded-2xl overflow-hidden shrink-0 ${!recipe.photoUrl ? `bg-gradient-to-br ${gradient}` : ''}`}>
+        <div className="relative lg:w-5/12 h-72 lg:h-auto rounded-2xl overflow-hidden shrink-0">
           {recipe.photoUrl ? (
             <img
               src={recipe.photoUrl}
@@ -84,8 +118,8 @@ export function RecipeDetail({ recipe }: Props) {
               className="absolute inset-0 w-full h-full object-cover object-center"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center opacity-25">
-              <span className="text-9xl select-none">🍽️</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+              <span className="text-9xl select-none opacity-25">🍽️</span>
             </div>
           )}
         </div>
@@ -94,26 +128,30 @@ export function RecipeDetail({ recipe }: Props) {
         <div className="flex-1 min-w-0">
           {/* Title + actions */}
           <div className="mb-3">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight">{recipe.title}</h1>
-              {isOwner && (
-                <div className="flex items-center gap-2 shrink-0">
-                  {!isPending && (
-                    <Link
-                      to={`/recipes/${recipe.id}/edit`}
-                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                    >
-                      Редактировать
-                    </Link>
-                  )}
+            <div className="flex items-start gap-3">
+              <h1 className="flex-1 text-xl md:text-2xl font-bold text-gray-900 leading-tight">
+                {recipe.title}
+              </h1>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Favorite */}
+                <button
+                  onClick={handleFavorite}
+                  className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-orange-50 hover:text-orange-500 active:scale-90 transition-all"
+                  aria-label="Сохранить в избранное"
+                >
+                  <BookmarkIcon />
+                </button>
+                {/* Owner ··· menu */}
+                {isOwner && (
                   <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                    onClick={() => setShowMenu(true)}
+                    className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                    aria-label="Действия"
                   >
-                    Удалить
+                    <DotsIcon />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -190,22 +228,28 @@ export function RecipeDetail({ recipe }: Props) {
             </div>
           )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="bg-gray-50 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-400 mb-0.5">Время готовки</p>
-              <p className="text-base font-bold text-gray-900">{recipe.cookingTimeMinutes}</p>
-              <p className="text-xs text-gray-400">мин</p>
+          {/* Stats with emoji icons */}
+          <div className="flex gap-2 mb-5">
+            <div className="flex-1 flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-3">
+              <span className="text-xl leading-none">⏱</span>
+              <div>
+                <p className="text-sm font-bold text-gray-900 leading-tight">{recipe.cookingTimeMinutes} мин</p>
+                <p className="text-xs text-gray-400">Время</p>
+              </div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-400 mb-0.5">Порции</p>
-              <p className="text-base font-bold text-gray-900">{recipe.servings}</p>
-              <p className="text-xs text-gray-400">чел.</p>
+            <div className="flex-1 flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-3">
+              <span className="text-xl leading-none">👥</span>
+              <div>
+                <p className="text-sm font-bold text-gray-900 leading-tight">{recipe.servings} чел.</p>
+                <p className="text-xs text-gray-400">Порции</p>
+              </div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-400 mb-0.5">Ингредиенты</p>
-              <p className="text-base font-bold text-gray-900">{recipe.ingredients.length}</p>
-              <p className="text-xs text-gray-400">шт.</p>
+            <div className="flex-1 flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-3">
+              <span className="text-xl leading-none">🥕</span>
+              <div>
+                <p className="text-sm font-bold text-gray-900 leading-tight">{recipe.ingredients.length} шт.</p>
+                <p className="text-xs text-gray-400">Состав</p>
+              </div>
             </div>
           </div>
 
@@ -238,7 +282,7 @@ export function RecipeDetail({ recipe }: Props) {
               >
                 <span className="text-sm text-gray-800 font-medium">{ing.name}</span>
                 <span className="text-sm text-gray-500">
-                  {[ing.amount, ing.unit].filter(Boolean).join(' ') || '—'}
+                  {[ing.amount, ing.unit?.toLowerCase()].filter(Boolean).join(' ') || '—'}
                 </span>
               </div>
             ))}
@@ -259,6 +303,40 @@ export function RecipeDetail({ recipe }: Props) {
           ))}
         </div>
       </section>
+
+      {/* Owner bottom sheet menu */}
+      {showMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40"
+            onClick={() => setShowMenu(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl pb-safe">
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <div className="px-4 pb-8 space-y-1">
+              {!isPending && (
+                <Link
+                  to={`/recipes/${recipe.id}/edit`}
+                  onClick={() => setShowMenu(false)}
+                  className="flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-gray-50 text-gray-800 font-medium transition-colors"
+                >
+                  <span className="text-gray-400"><EditIcon /></span>
+                  Редактировать
+                </Link>
+              )}
+              <button
+                onClick={() => { setShowMenu(false); setConfirmDelete(true); }}
+                className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-red-50 text-red-500 font-medium transition-colors"
+              >
+                <TrashIcon />
+                Удалить рецепт
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Delete confirm dialog */}
       {confirmDelete && (
